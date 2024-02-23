@@ -293,7 +293,7 @@ server <- function(input, output, session) {
   #   shiny::div(shiny::h4("Causal Network Model Regression"), shiny::HTML(lm_tab$knitr))
   #  })
   output$download_all_data_csv <- downloadHandler(
-    filename = "dgm_demo_data.csv",
+    filename = "aat_data.csv",
     content = function(file) {
       dec <- ifelse(input$dec, ",", ".") 
       write.table(master, file, row.names = FALSE, dec = dec, sep = ";", quote = T)

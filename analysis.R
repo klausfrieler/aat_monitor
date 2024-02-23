@@ -114,13 +114,19 @@ parse_aat <- function(entry){
     map_dfc(parts, function(entries){
       map_dfr(entries, function(i){
         tmp <- aat[[i]] %>% t() %>% as.data.frame() 
+        #in group c M-type values are inverted
+        if(group == "c" & str_detect(i, "_M")){
+          tmp <- (7 - aat[[i]]) %>% t() %>% as.data.frame() 
+          
+        }
         tmp <- restructe_aat_names(tmp)
         tmp[sort(names(tmp))] %>% as_tibble()
       })
     })
+  
   ret %>% mutate(AAT.quest_type = group, 
-                 stimulus = aat[["AAT_stim_order_random"]]) %>% 
-    select(stimulus, AAT.quest_type, everything())
+                 AAT.stimulus = aat[["AAT_stim_order_random"]]) %>% 
+    select(AAT.stimulus, AAT.quest_type, everything())
   
 }
 read_data <- function(result_dir = "data/from_server"){
@@ -189,6 +195,8 @@ setup_workspace <- function(results = "data/from_server"){
                                               levels = 1:4, 
                                               labels = c("female", "male", "other", "rather not say"))) 
   names(master)[names(master) %in% names(AAT_labels)] <- AAT_labels[names(master)[names(master) %in% names(AAT_labels)]]
+  #master_patch <- master %>% filter(AAT.quest_type == "c") %>% mutate(across(starts_with("MX"), function(x) 8 - x))
+  #master[!is.na(master$AAT.quest_type) & master$AAT.quest_type == "c", names(master)[str_detect(names(master), "^MX")]] <- master_patch
   assign("master", master, globalenv())
   invisible(master)
 }
