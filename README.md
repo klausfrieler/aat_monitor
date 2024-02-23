@@ -1,2 +1,2 @@
-# DGM DOTS DEmo Online Survey Monitor
-shiny app to monitor the DGM DOTS DEMO Online Survey
+# AAT Monitor
+Shiny app to monitor the AAT battery on the DOTS server
