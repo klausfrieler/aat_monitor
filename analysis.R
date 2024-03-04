@@ -105,6 +105,7 @@ parse_aat <- function(entry){
   else{
     return(NULL)
   }
+  #browser()
   parts <- list(
     PG =  names(aat)[2:31][str_detect(names(aat)[2:31], "PG$")],
     M =  names(aat)[2:31][str_detect(names(aat)[2:31], "M$")],
@@ -120,12 +121,20 @@ parse_aat <- function(entry){
           
         }
         tmp <- restructe_aat_names(tmp)
-        tmp[sort(names(tmp))] %>% as_tibble()
+        item_order <- str_extract(names(tmp), "[0-9]+$") %>% 
+          as.integer() %>% 
+          paste(collapse = ",")
+        item_order_var <- sprintf("AAT.%s.item_order", str_extract(i, "[A-Z]+$") %>% tolower())
+        #browser()
+        tmp[sort(names(tmp))] %>% as_tibble() %>% mutate(!!sym(item_order_var) := item_order)
       })
     })
   
   ret %>% mutate(AAT.quest_type = group, 
-                 AAT.stimulus = aat[["AAT_stim_order_random"]]) %>% 
+                 AAT.stimulus = aat[["AAT_stim_order_random"]],
+                 AAT.stim_order = paste(str_extract(aat[["AAT_stim_order_random"]],"[0-9]+$") %>% 
+                                          as.integer(), 
+                                        collapse = ",")) %>% 
     select(AAT.stimulus, AAT.quest_type, everything())
   
 }
