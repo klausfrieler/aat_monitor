@@ -209,7 +209,7 @@ setup_workspace <- function(results = "data/from_server"){
   #browser()
   master <- read_data(results) 
   master <- master %>% mutate(p_id = as.character(p_id),
-                              age = round(DEG.age/12), 
+                              age = round(DEG.age), 
                               gender = factor(DEG.gender, 
                                               levels = 1:4, 
                                               labels = c("female", "male", "other", "rather not say"))) 
@@ -218,7 +218,7 @@ setup_workspace <- function(results = "data/from_server"){
   #master[!is.na(master$AAT.quest_type) & master$AAT.quest_type == "c", names(master)[str_detect(names(master), "^MX")]] <- master_patch
   master <- master %>% 
     group_by(p_id) %>% 
-    mutate(is_good = time_spent > 15 & n() == 10 & nchar(as.character(p_id)) ==24) %>% 
+    mutate(valid = time_spent > 15 & n() == 10 & nchar(as.character(p_id)) ==24) %>% 
     ungroup()
   assign("master", master, globalenv())
   invisible(master)

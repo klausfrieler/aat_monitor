@@ -62,7 +62,7 @@ impressum <- function(){
                  "Deutsche Gesellschaft für Musikspsychologie", target = "_blank"),
         shiny::tags$br(), 
         shiny::tags$br(),
-        shiny::a(href = "https://github.com/klausfrieler/dmg_monitor", "On Github", target = "_blank"), 
+        #shiny::a(href = "https://github.com/klausfrieler/dmg_monitor", "On Github", target = "_blank"), 
         style = "font-size: 10pt; display: block"
     )
     
@@ -192,7 +192,7 @@ ui_new <-
 # Define server logic required to draw a plot
 server <- function(input, output, session) {
   message("*** STARTING APP***")
-  check_data <- reactiveFileReader(1000, session, result_dir, setup_workspace)
+  check_data <- reactiveFileReader(10000, session, result_dir, setup_workspace)
   shiny::observeEvent(input$switch_axes, {
     x <- input$bv_variable1
     y <- input$bv_variable2
@@ -207,7 +207,7 @@ server <- function(input, output, session) {
     check_data()
     #browser()
     p_id_stats <- master %>% 
-      distinct(p_id, gender, age, GMS.general, complete) %>% 
+      distinct(p_id, gender, age, GMS.general, complete, valid) %>% 
       summarise(n_female = sum(gender == "female", na.rm = T), 
                 n_male = sum(gender == "male", na.rm = T), 
                 n_other = sum(gender == "other", na.rm = T), 
@@ -216,18 +216,19 @@ server <- function(input, output, session) {
                 mean_GMS = mean(GMS.general, na.rm = T), 
                 n_unique = n(),
                 n_complete = sum(complete, na.rm = T),
+                n_bad = sum(!valid),
                 .groups = "drop")
     p_id_stats %>% 
-      select(n_unique, n_complete, starts_with("n"), mean_age, mean_GMS, everything()) %>% 
-      set_names("Total N", "Completed", "Females", "Males", "Other", "Rather not say",  "Mean Age", "Mean GMS General") 
+      select(n_unique, n_complete, n_bad, starts_with("n"), mean_age, mean_GMS, everything()) %>% 
+      set_names("Total N", "Completed", "Invalid", "Females", "Males", "Other", "Rather not say",  "Mean Age", "Mean GMS General") 
     })
    
     output$raw_data <- renderDataTable({
       check_data()
       master %>% 
-        select(-p_id, -num_restarts, -pilot,  -DEG.age, -DEG.gender, -GMS.instrument ) %>% 
+        select(-num_restarts, -DEG.age, -DEG.gender) %>% 
         mutate_if(is.numeric, round, 2) %>% 
-        select(time_started, time_ended, language, complete, age, gender, everything())
+        select(p_id, time_started, time_ended = current_time, time_spent, valid, complete, age, gender, everything())
       }, options = list(lengthMenu = list(c(25, 50,  -1), c("25", "50",  "All"))))
    
     output$univariate_plot <- renderPlot({
