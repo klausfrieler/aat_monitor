@@ -11,7 +11,7 @@ AAT_M_labels <- GAR::GAR_dict %>%
   select(key, en) %>% 
   arrange(key) %>% 
   mutate(var_name = sprintf("AAT.m%02d", 1:nrow(.))) %>% 
-  mutate(label = sprintf("MX.%s", en)) %>% select(-en)
+  mutate(label = sprintf("MX.%s", str_replace(en, "-", "_"))) %>% select(-en)
 
 AAT_AT_labels <- tibble(label = c("AT.attention_grabbing", 
                                   "AT.disturbing",
@@ -118,8 +118,8 @@ parse_aat <- function(entry){
         }
         tmp <- aat[[i]] %>% t() %>% as.data.frame() 
         #in group c M-type values are inverted
-        if(group == "c" & str_detect(i, "_M")){
-          tmp <- (7 - aat[[i]]) %>% t() %>% as.data.frame() 
+        if(group == "b" & str_detect(i, "_M")){
+          tmp <- (6 - aat[[i]]) %>% t() %>% as.data.frame() 
           
         }
         tmp <- restructe_aat_names(tmp)
@@ -158,7 +158,9 @@ read_data <- function(result_dir = "data/from_server"){
       return(NULL)
     }
     #file.copy(fname, to = "e:/projects/science/DOTS/development/shiny_apps/mas_monitor/data/from_server/")    
+    #tictoc::tic()
     aat <- parse_aat(tmp)  
+    #tictoc::toc()
     if(is.null(aat)){
       messagef("Incomplete aat for %s", tmp$session$p_id)
     }
@@ -207,7 +209,7 @@ read_data <- function(result_dir = "data/from_server"){
 
 setup_workspace <- function(results = "data/from_server"){
   #browser()
-  master <- read_data(results) 
+  master <- read_data(results) %>% set_names(str_replace(names(.), "-", "_"))
   master <- master %>% mutate(p_id = as.character(p_id),
                               age = round(DEG.age), 
                               gender = factor(DEG.gender, 
@@ -220,7 +222,8 @@ setup_workspace <- function(results = "data/from_server"){
     group_by(p_id) %>% 
     mutate(valid = time_spent > 15 & n() == 10 & nchar(as.character(p_id)) ==24) %>% 
     ungroup()
-  assign("master", master, globalenv())
+  assign("master_full", master, globalenv())
+  assign("master", master %>% filter(valid), globalenv())
   invisible(master)
 }
 
@@ -299,3 +302,25 @@ get_model <- function(data, dv = "SRS.perc_correct", predictors = num_predictors
 
 critical_ids <- c("987fb62146719d31661449c5a9d35b3a9134f284704cbe39948f1289be9ca6d0", 
                   "914a6e1ac9f1aef51e3c9c49c4d97b0c5adcf810a0ba5cb92d36e77eeff498bd")
+
+get_subgroup_correlations <- function(data = master, vars_prefix){
+  vars <- data %>% select(starts_with(vars_prefix)) %>% names()
+  #data <- data %>% select(starts_with(vars_prefix), AAT_quest_type)
+  qt <- unique(data$AAT.quest_type)
+  map_dfr(vars, function(v){
+    data <- data %>% 
+      select(!!v, AAT.quest_type, AAT.stimulus) 
+    data <- data %>% 
+      group_by(AAT.quest_type, AAT.stimulus) %>% 
+      summarise(m = mean(!!sym(v), na.rm  = T), .groups = "drop")
+      tmp <- data %>% 
+        pivot_wider(id_cols = c(AAT.stimulus), names_from = c(AAT.quest_type), values_from = m)
+      tmp %>% 
+        select(!AAT.stimulus) %>% 
+        correlation::correlation(p_adjust = "none") %>% 
+        as_tibble() %>% 
+        select(x = Parameter1, y = Parameter2, r, p) %>% 
+        mutate(var = v)
+      #browser()
+  })    
+}
