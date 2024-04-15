@@ -93,7 +93,6 @@ restructe_aat_names <- function(aat_part){
   return(aat_part)  
 }
 parse_aat <- function(entry){
-  #browser()
   group <- entry$results$group
   aat <-  entry %>% pluck("AAT")   
   if(is.null(aat)){
@@ -114,6 +113,9 @@ parse_aat <- function(entry){
   ret <- 
     map_dfc(parts, function(entries){
       map_dfr(entries, function(i){
+        if(is.na(i)){
+          return(NULL)
+        }
         tmp <- aat[[i]] %>% t() %>% as.data.frame() 
         #in group c M-type values are inverted
         if(group == "c" & str_detect(i, "_M")){
@@ -129,7 +131,10 @@ parse_aat <- function(entry){
         tmp[sort(names(tmp))] %>% as_tibble() %>% mutate(!!sym(item_order_var) := item_order)
       })
     })
-  
+  if(length(aat[["AAT_stim_order_random"]]) != nrow(ret)){
+    messagef("Found inclompete AAT data %d vs. %d", nrow(ret), length(aat[["AAT_stim_order_random"]]) )
+    return(NULL)
+  }
   ret %>% mutate(AAT.quest_type = group, 
                  AAT.stimulus = aat[["AAT_stim_order_random"]],
                  AAT.stim_order = paste(str_extract(aat[["AAT_stim_order_random"]],"[0-9]+$") %>% 
@@ -154,6 +159,9 @@ read_data <- function(result_dir = "data/from_server"){
     }
     #file.copy(fname, to = "e:/projects/science/DOTS/development/shiny_apps/mas_monitor/data/from_server/")    
     aat <- parse_aat(tmp)  
+    if(is.null(aat)){
+      messagef("Incomplete aat for %s", tmp$session$p_id)
+    }
     deg <- NULL
     if("DEG" %in% names(tmp)){
       #browser()
@@ -187,8 +195,9 @@ read_data <- function(result_dir = "data/from_server"){
     if("GMS" %in% names(tmp)){
       gms <- tibble(GMS.general = tmp$GMS$General)
     }
-    #browser()
-    session <- tmp$session[c("p_id", "time_started", "complete")] %>% as.data.frame()
+    session <- tmp$session[c("p_id", "time_started", "current_time", "complete", "num_restarts")] %>% as.data.frame() %>% as_tibble()
+    session$time_spent <- difftime(tmp$session$current_time, tmp$session$time_started, units = "mins") %>% as.numeric()
+    
     bind_cols(session, deg, deghi, prof, gms, aat)
   }) %>% 
     distinct() %>% 
@@ -199,13 +208,18 @@ read_data <- function(result_dir = "data/from_server"){
 setup_workspace <- function(results = "data/from_server"){
   #browser()
   master <- read_data(results) 
-  master <- master %>% mutate(age = round(DEG.age/12), 
+  master <- master %>% mutate(p_id = as.character(p_id),
+                              age = round(DEG.age/12), 
                               gender = factor(DEG.gender, 
                                               levels = 1:4, 
                                               labels = c("female", "male", "other", "rather not say"))) 
   names(master)[names(master) %in% names(AAT_labels)] <- AAT_labels[names(master)[names(master) %in% names(AAT_labels)]]
   #master_patch <- master %>% filter(AAT.quest_type == "c") %>% mutate(across(starts_with("MX"), function(x) 8 - x))
   #master[!is.na(master$AAT.quest_type) & master$AAT.quest_type == "c", names(master)[str_detect(names(master), "^MX")]] <- master_patch
+  master <- master %>% 
+    group_by(p_id) %>% 
+    mutate(is_good = time_spent > 15 & n() == 10 & nchar(as.character(p_id)) ==24) %>% 
+    ungroup()
   assign("master", master, globalenv())
   invisible(master)
 }
@@ -282,3 +296,6 @@ get_model <- function(data, dv = "SRS.perc_correct", predictors = num_predictors
   }
   lm_tab
 }
+
+critical_ids <- c("987fb62146719d31661449c5a9d35b3a9134f284704cbe39948f1289be9ca6d0", 
+                  "914a6e1ac9f1aef51e3c9c49c4d97b0c5adcf810a0ba5cb92d36e77eeff498bd")
